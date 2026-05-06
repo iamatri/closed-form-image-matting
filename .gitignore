@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Results and data (large files)
+results/*.png
+results/*.jpg
+data/images/*.png
+data/trimaps/*.png
+data/gt_alpha/*.png
+data/scribbles/*.png
+
+# But keep directory structure
+!results/.gitkeep
+!data/images/.gitkeep
+!data/trimaps/.gitkeep
+!data/gt_alpha/.gitkeep
+!data/scribbles/.gitkeep
+
+# Keep documentation and small files
+!*.md
+!*.txt
+.backup_tests/
