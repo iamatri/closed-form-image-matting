@@ -35,7 +35,10 @@ class InteractiveMatting:
 
         self.scribble_window = "1. Draw Scribbles (Space=Process, C=Clear, Q=Quit)"
         self.alpha_window = "2. Alpha Matte Result"
-        self.composite_window = "3. Composite on Green Screen"
+        self.composite_window = "3. Composite (Press B to change background)"
+
+        self.backgrounds = ['white', 'black', 'green', 'red', 'blue', 'checkerboard']
+        self.current_bg_idx = 2  # Start with green (index 2)
 
         sys.path.insert(0, os.path.dirname(__file__))
         from closed_form_matting import solve_closed_form_matting
@@ -82,6 +85,39 @@ class InteractiveMatting:
                         self.bg_color, self.brush_size * 2)
                 cv2.line(self.scribble_mask, self.prev_point, (x, y),
                         0, self.brush_size * 2)
+                
+    def create_checkerboard(self, square_size=20):
+        """Create a checkerboard pattern background."""
+        h, w = self.height, self.width
+        checkerboard = np.zeros((h, w, 3), dtype=np.uint8)
+
+        for i in range(0, h, square_size):
+            for j in range(0, w, square_size):
+                if ((i // square_size) + (j // square_size)) % 2 == 0:
+                    checkerboard[i:i+square_size, j:j+square_size] = [200, 200, 200]
+                else:
+                    checkerboard[i:i+square_size, j:j+square_size] = [100, 100, 100]
+
+        return checkerboard
+    
+    def get_background(self):
+        """Get the current background based on selected index."""
+        bg_name = self.backgrounds[self.current_bg_idx]
+
+        if bg_name == 'white':
+            return np.ones_like(self.original_image) * [255, 255, 255]
+        elif bg_name == 'black':
+            return np.zeros_like(self.original_image)
+        elif bg_name == 'green':
+            return np.ones_like(self.original_image) * [0, 255, 0]
+        elif bg_name == 'red':
+            return np.ones_like(self.original_image) * [0, 0, 255]  # BGR format
+        elif bg_name == 'blue':
+            return np.ones_like(self.original_image) * [255, 0, 0]  # BGR format
+        elif bg_name == 'checkerboard':
+            return self.create_checkerboard()
+        else:
+            return np.ones_like(self.original_image) * [0, 255, 0]  # Default green
 
     def clear_scribbles(self):
         self.display_image = self.original_image.copy()
@@ -107,8 +143,8 @@ class InteractiveMatting:
             alpha = self.solve_matting(image_rgb, self.scribble_mask, lambda_param=100)
             self.alpha_matte = (alpha * 255).astype(np.uint8)
 
-            green_bg = np.array([0, 255, 0], dtype=np.uint8)
-            bg = np.ones_like(self.original_image) * green_bg
+            # Use the background selection function
+            bg = self.get_background()
             composite = self.original_image * alpha[:, :, np.newaxis] + \
                        bg * (1 - alpha[:, :, np.newaxis])
             self.composite = composite.astype(np.uint8)
@@ -166,7 +202,10 @@ class InteractiveMatting:
                    font, 0.5, (255, 255, 255), 1)
         y += 25
         cv2.putText(img, "C: Clear scribbles  |  S: Save results", (20, y),
-                   font, 0.5, (255, 255, 255), 1)
+                   font, 0.5, (255, 255, 255), 1)   
+        y += 25
+        cv2.putText(img, "B: Change background", (20, y),
+                font, 0.5, (255, 255, 255), 1)
         y += 25
         cv2.putText(img, "Q/ESC: Quit", (20, y),
                    font, 0.5, (255, 255, 255), 1)
@@ -211,6 +250,21 @@ class InteractiveMatting:
 
             elif key == ord('s'):
                 self.save_results()
+
+            elif key == ord('b'):
+                if self.alpha_matte is not None:
+                    # Cycle to next background
+                    self.current_bg_idx = (self.current_bg_idx + 1) % len(self.backgrounds)
+
+                    # Regenerate composite with new background
+                    bg = self.get_background()
+                    alpha = self.alpha_matte / 255.0
+                    self.composite = (self.original_image * alpha[:, :, np.newaxis] +
+                                    bg * (1 - alpha[:, :, np.newaxis])).astype(np.uint8)
+
+                    print(f"background: {self.backgrounds[self.current_bg_idx]}")
+                else:
+                    print("process matting first (press space) before changing background")
 
             elif key == ord('+') or key == ord('='):
                 self.brush_size = min(20, self.brush_size + 1)
